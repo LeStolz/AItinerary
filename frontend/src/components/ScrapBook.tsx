@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_URL } from '../config';
-import { Box, Card, Flex, Text, Heading, Button, Dialog, ScrollArea, IconButton, DropdownMenu, TextArea, Tabs } from '@radix-ui/themes';
+import { Box, Card, Flex, Text, Heading, Button, Dialog, ScrollArea, IconButton, DropdownMenu, TextArea, Tabs, Skeleton } from '@radix-ui/themes';
 import { Plus, Trash, Edit2, FileText, MapPin, User, Upload } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -12,26 +12,23 @@ interface TravelCard {
 }
 
 export function ScrapBook() {
-  const [cards, setCards] = useState<TravelCard[]>([
-    {
-      id: -1,
-      type: 'preference',
-      title: '',
-      content: ''
-    }
-  ]);
+  const [cards, setCards] = useState<TravelCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState<string | null>(null);
   const [editingCardId, setEditingCardId] = useState<number | null>(null);
   const [markdown, setMarkdown] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadCards = async () => {
+    setIsLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/cards`, { credentials: 'include' });
       const data = await res.json();
       setCards(data);
     } catch (e) {
       console.error("Failed to load cards", e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -162,36 +159,57 @@ export function ScrapBook() {
 
       <ScrollArea type="always" scrollbars="vertical" className="flex-1 mt-4">
         <div className="flex flex-wrap items-start gap-4 pr-4">
-          {cards.map(card => (
-            <Card
-              key={card.id} size="2"
-              className="w-fit max-w-full relative group shadow-sm hover:shadow-md dark:shadow-black/40 transition-shadow"
-            >
-              <Flex justify="between" align="center" mb="2">
-                <Flex align="center" gap="2">
-                  {getCardIcon(card.type)}
-                  <Text weight="bold" size="3" truncate className="max-w-3xl">{card.title}</Text>
+          {isLoading ? (
+            [0, 1, 2, 3].map((_, i) => (
+              <Card key={i} size="2" className="w-80 h-64 max-w-full shadow-sm dark:shadow-black/40 transition-shadow overflow-hidden flex flex-col">
+                <Flex justify="between" align="center" mb="4">
+                  <Flex align="center" gap="2">
+                    <Skeleton width="2rem" height="2rem" />
+                    <Skeleton width="10rem" height="2rem" />
+                  </Flex>
                 </Flex>
-                <Flex gap="2" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <IconButton size="1" variant="ghost" color="gray" onClick={() => handleEdit(card)}>
-                    <Edit2 size={16} />
-                  </IconButton>
-                  <IconButton size="1" variant="ghost" color="red" onClick={() => handleDelete(card.id)}>
-                    <Trash size={16} />
-                  </IconButton>
+                <Flex direction="column" gap="2">
+                  <Skeleton width="100%" height="1rem" />
+                  <Skeleton width="90%" height="1rem" />
+                  <Skeleton width="95%" height="1rem" />
+                  <Skeleton width="60%" height="1rem" />
                 </Flex>
-              </Flex>
-              <ScrollArea type="auto" scrollbars="vertical">
-                <Box className="prose dark:prose-invert text-sm max-h-64">
-                  <ReactMarkdown>{renderCardContent(card)}</ReactMarkdown>
-                </Box>
-              </ScrollArea>
-            </Card>
-          ))}
-          {cards.length === 0 && (
-            <Heading size="7" className="block w-full bg-gradient-to-r from-indigo-500 to-cyan-500 bg-clip-text text-transparent">
-              Add a card to get started!
-            </Heading>
+              </Card>
+            ))
+          ) : (
+            <>
+              {cards.map(card => (
+                <Card
+                  key={card.id} size="2"
+                  className="w-80 h-64 max-w-full relative group shadow-sm hover:shadow-md dark:shadow-black/40 transition-shadow overflow-hidden flex flex-col"
+                >
+                  <Flex justify="between" align="center" mb="2">
+                    <Flex align="center" gap="2">
+                      {getCardIcon(card.type)}
+                      <Text weight="bold" size="3" truncate className="max-w-[12rem]">{card.title}</Text>
+                    </Flex>
+                    <Flex gap="2" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <IconButton size="1" variant="ghost" color="gray" onClick={() => handleEdit(card)}>
+                        <Edit2 size={16} />
+                      </IconButton>
+                      <IconButton size="1" variant="ghost" color="red" onClick={() => handleDelete(card.id)}>
+                        <Trash size={16} />
+                      </IconButton>
+                    </Flex>
+                  </Flex>
+                  <ScrollArea type="auto" scrollbars="vertical" className="flex-1">
+                    <Box className="prose dark:prose-invert text-sm pb-2">
+                      <ReactMarkdown>{renderCardContent(card)}</ReactMarkdown>
+                    </Box>
+                  </ScrollArea>
+                </Card>
+              ))}
+              {cards.length === 0 && (
+                <Heading size="7" className="block w-full bg-gradient-to-r from-indigo-500 to-cyan-500 bg-clip-text text-transparent">
+                  Add a card to get started!
+                </Heading>
+              )}
+            </>
           )}
         </div>
       </ScrollArea>

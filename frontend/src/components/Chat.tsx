@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { API_URL } from '../config';
-import { Box, Card, Flex, Text, TextField, Button, ScrollArea, Heading, Badge } from '@radix-ui/themes';
+import { Box, Card, Flex, Text, TextField, Button, ScrollArea, Heading, Badge, Skeleton } from '@radix-ui/themes';
 import { Send, Map, Search, Clock, CheckCircle2, LayoutList } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -11,20 +11,14 @@ interface Message {
 }
 
 export function Chat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '-1',
-      sender: 'User',
-      content: '',
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [activeAgent, setActiveAgent] = useState('Orchestrator Agent');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Load history on mount
     fetch(`${API_URL}/api/chat/history`, { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
@@ -35,11 +29,11 @@ export function Chat() {
             content: msg.content,
             type: msg.type
           })));
-          // Scroll immediately after load without smooth behavior for initial snap
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 100);
         }
       })
-      .catch(err => console.error("Failed to load chat history:", err));
+      .catch(err => console.error("Failed to load chat history:", err))
+      .finally(() => setIsInitialLoad(false));
   }, []);
 
   useEffect(() => {
@@ -154,7 +148,23 @@ export function Chat() {
         <Flex direction="column" align="center">
           <Flex direction="column" gap="4" className="w-full max-w-3xl">
 
-            {messages.length === 0 && (
+            {isInitialLoad ? (
+              <Flex direction="column" gap="4" className="w-full mt-8">
+                <Flex justify="end" className="w-full">
+                  <Skeleton width="40%" height="4rem" />
+                </Flex>
+                {[1, 3].map(i => (
+                  <Flex justify="start" className="w-full">
+                    <Box width="100%">
+                      <Flex align="center" gap="2" mb="1">
+                        <Skeleton width="8rem" height="2rem" />
+                      </Flex>
+                      <Skeleton width="100%" height={`${i * 4}rem`} />
+                    </Box>
+                  </Flex>
+                ))}
+              </Flex>
+            ) : messages.length === 0 && (
               <Flex align="center" justify="center" className="min-h-96">
                 <Heading size="7" className="p-16 bg-gradient-to-r from-indigo-500 to-cyan-500 bg-clip-text text-transparent">
                   Where to next?
