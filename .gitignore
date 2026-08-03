@@ -1,0 +1,43 @@
+# Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Backend
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+qdrant_db/
+qdrant_data/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# IDE
+.agents/
+skills-lock.json
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

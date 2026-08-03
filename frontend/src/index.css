@@ -1,0 +1,26 @@
+@layer theme, base, components, radix, utilities;
+
+@import "@radix-ui/themes/styles.css" layer(radix);
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@variant dark (&:where(.dark, .dark *));
+
+body,
+html,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--color-page-background);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Force standard cursor behavior on Radix buttons */
+.rt-Button:where(:not(:disabled)) {
+  cursor: pointer;
+}
