@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, max_retries=3)
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0, max_retries=3)
 
 class Router(BaseModel):
     next: Literal["Scrapbook Agent", "Logistics Agent", "Booking Agent", "FINISH"]
