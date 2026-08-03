@@ -11,6 +11,7 @@ export function Auth() {
       const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ credential: credentialResponse.credential }),
       });
 
@@ -19,7 +20,6 @@ export function Auth() {
         throw new Error(data.detail || 'Failed to authenticate with Google');
       }
 
-      // Reload the page to trigger the App.tsx user fetch
       window.location.reload();
     } catch (err: any) {
       setError(err.message);
@@ -38,10 +38,12 @@ export function Auth() {
             Sign in to manage your itineraries.
           </Text>
 
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError('Google Sign-In Failed')}
-          />
+          <Flex direction="column" align="stretch" className="w-full">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Google Sign-In Failed')}
+            />
+          </Flex>
 
           {error && <Text size="2" color="red">{error}</Text>}
         </Flex>

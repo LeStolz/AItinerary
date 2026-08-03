@@ -19,3 +19,6 @@ An intelligent travel planner, tuned from **Google Gemini 3.5 Flash LLM Engine**
 - validates live feasibility and costs.
 - calls Mock Booking API and MCP to fetch real-time prices for accommodations, substituting options if draft items are sold out or over budget.
 - outputs a finalized, fully priced, itinerary with booking links.
+
+### Others
+- Other data is stored using **SQL**.
