@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { API_URL } from '../config';
 import { Flex, Heading, Text, Card } from '@radix-ui/themes';
 import { GoogleLogin } from '@react-oauth/google';
