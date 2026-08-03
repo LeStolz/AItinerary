@@ -64,8 +64,8 @@ scrapbook_node = make_worker_node(
     scrapbook_tools,
     "Scrapbook Agent. You are a Scrapbook Agent. Use your tools to perform a semantic search on the user's travel board. "
     "Formulate a highly relevant search query based on the user's input (e.g. 'beach destinations', 'dietary restrictions', 'Paris trip'). "
-    "Extract and output ONLY the user's preferences, dream destinations, or journals exactly as they are returned by your search tool. "
-    "Do NOT infer, hallucinate, or make up ANY details, key wishes, activities, or places that are not explicitly written in the search results. "
+    "Extract and output ONLY the user's preferences, dream destinations, or journals exactly as they are returned by your search tool right now. "
+    "CRITICAL: The user's scrapbook changes over time. You MUST completely IGNORE any mention of the scrapbook or destinations in the past chat history. Do NOT infer, hallucinate, or make up ANY details, key wishes, activities, or places. You must strictly output ONLY what your tool returns for this specific query."
     "If the search returns no relevant information, state that the information is not saved on the board. Act STRICTLY as a literal data retriever."
 )
 
