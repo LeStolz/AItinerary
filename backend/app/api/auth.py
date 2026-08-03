@@ -6,8 +6,9 @@ from jose import JWTError, jwt
 from app.db import models, database
 
 router = APIRouter()
+import os
 
-SECRET_KEY = "supersecretkey_dontuseinprod"
+SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
