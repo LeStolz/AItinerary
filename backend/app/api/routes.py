@@ -106,7 +106,11 @@ import os
 
 @asynccontextmanager
 async def get_checkpointer():
-    db_url = os.getenv("DATABASE_POSTGRES_PRISMA_URL") or "sqlite:///./aitinerary.db"
+    db_url = os.getenv("DATABASE_POSTGRES_PRISMA_URL")
+    if db_url:
+        db_url = db_url.replace("?pgbouncer=true", "")
+        db_url = db_url.replace("&pgbouncer=true", "")
+        
     if db_url and db_url.startswith("postgres"):
         # Fix for sqlalchemy postgresql:// vs psycopg postgres://
         if db_url.startswith("postgresql://"):
