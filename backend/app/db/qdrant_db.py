@@ -3,8 +3,13 @@ from qdrant_client.http.models import Distance, VectorParams
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import os
 
-# Initialize Local Qdrant Client (File-based)
-qdrant_client = QdrantClient(path="qdrant_db")
+qdrant_url = os.getenv("QDRANT_URL")
+qdrant_api_key = os.getenv("QDRANT_API_KEY")
+
+if qdrant_url and qdrant_api_key:
+    qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+else:
+    qdrant_client = QdrantClient(path="qdrant_db")
 
 # Initialize Gemini Embeddings
 embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")

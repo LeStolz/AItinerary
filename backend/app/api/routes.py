@@ -101,7 +101,23 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.agents.graph import build_graph
 
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from contextlib import asynccontextmanager
+import os
 
+@asynccontextmanager
+async def get_checkpointer():
+    db_url = os.getenv("DATABASE_URL")
+    if db_url and db_url.startswith("postgres"):
+        # Fix for sqlalchemy postgresql:// vs psycopg postgres://
+        if db_url.startswith("postgresql://"):
+            db_url = db_url.replace("postgresql://", "postgres://", 1)
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        async with AsyncPostgresSaver.from_conn_string(db_url) as memory:
+            await memory.setup()
+            yield memory
+    else:
+        async with AsyncSqliteSaver.from_conn_string("aitinerary.db") as memory:
+            yield memory
 # Global graph instance (uncompiled)
 workflow = build_graph()
 
@@ -110,7 +126,7 @@ async def get_chat_history(user: models.User = Depends(get_current_user)):
     config = {"configurable": {"thread_id": str(user.id)}}
     messages = []
     
-    async with AsyncSqliteSaver.from_conn_string("aitinerary.db") as memory:
+    async with get_checkpointer() as memory:
         graph = workflow.compile(checkpointer=memory)
         state = await graph.aget_state(config)
         
@@ -157,7 +173,7 @@ async def chat_endpoint(request: Request, user: models.User = Depends(get_curren
         input_state = initial_state
         while True:
             try:
-                async with AsyncSqliteSaver.from_conn_string("aitinerary.db") as memory:
+                async with get_checkpointer() as memory:
                     graph = workflow.compile(checkpointer=memory)
                     async for s in graph.astream(input_state, config=config, stream_mode="updates"):
                         for node_name, node_output in s.items():
