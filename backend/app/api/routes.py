@@ -215,10 +215,9 @@ async def chat_endpoint(request: Request, user: models.User = Depends(get_curren
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                     yield json.dumps({
                         "sender": "System",
-                        "content": "[!] Rate limited by Gemini (15 RPM). Sleeping for 60 seconds to reset..."
+                        "content": "[!] You have hit the Google API Rate Limit (Your key is currently limited to 5 Requests Per Minute). Please wait a minute or upgrade your Google Cloud tier to use multi-agent workflows."
                     })
-                    await asyncio.sleep(60)
-                    input_state = None
+                    break
                 else:
                     yield json.dumps({
                         "sender": "System",
