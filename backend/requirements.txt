@@ -2,7 +2,7 @@ fastapi
 uvicorn
 sqlalchemy
 python-jose[cryptography]
-resend
+google-auth
 qdrant-client>=1.7.0
 langchain>=0.1.0
 langchain-google-genai

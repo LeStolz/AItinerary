@@ -16,6 +16,8 @@ embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")
 
 COLLECTION_NAME = "travel_cards"
 
+from qdrant_client.http.models import PayloadSchemaType
+
 # Ensure collection exists with correct dimensions (Gemini-2 is 3072)
 try:
     col = qdrant_client.get_collection(collection_name=COLLECTION_NAME)
@@ -29,6 +31,15 @@ except Exception:
         collection_name=COLLECTION_NAME,
         vectors_config=VectorParams(size=3072, distance=Distance.COSINE),
     )
+
+try:
+    qdrant_client.create_payload_index(
+        collection_name=COLLECTION_NAME,
+        field_name="user_id",
+        field_schema=PayloadSchemaType.INTEGER,
+    )
+except Exception:
+    pass
 
 def get_qdrant_client():
     return qdrant_client

@@ -4,16 +4,23 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from app.db import models, database
+import os
+import json
+import uuid
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 router = APIRouter()
-import os
 
 SECRET_KEY = os.getenv("DATABASE_SUPABASE_JWT_SECRET")
+if not SECRET_KEY:
+    raise ValueError("DATABASE_SUPABASE_JWT_SECRET is not set")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
-class LoginRequest(BaseModel):
-    email: str
+class GoogleAuthRequest(BaseModel):
+    credential: str
 
 def create_access_token(data: dict, expires_delta: timedelta):
     to_encode = data.copy()
@@ -39,51 +46,21 @@ def get_current_user(request: Request, db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
-import os
-import resend
-from dotenv import load_dotenv
-from fastapi.responses import RedirectResponse
-
-load_dotenv()
-resend.api_key = os.getenv("RESEND_API_KEY")
-
-class MagicLinkRequest(BaseModel):
-    email: str
-
-@router.post("/send-magic-link")
-def send_magic_link(req: MagicLinkRequest, request: Request):
-    expires_delta = timedelta(minutes=15)
-    to_encode = {"sub": req.email, "type": "magic_link"}
-    expire = datetime.utcnow() + expires_delta
-    to_encode.update({"exp": expire})
-    magic_token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-    verify_url = f"{request.base_url.replace(path='')}/api/auth/verify?token={magic_token}"
-
+@router.post("/google")
+def google_auth(req: GoogleAuthRequest, response: Response, db: Session = Depends(database.get_db)):
     try:
-        resend.Emails.send({
-            "from": "onboarding@resend.dev",
-            "to": req.email,
-            "subject": "Log in to AItinerary",
-            "html": f'<p>Click <a href="{verify_url}">here</a> to securely log in to AItinerary.</p>'
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    return {"message": "Magic link sent"}
-
-@router.get("/verify")
-def verify_magic_link(token: str, db: Session = Depends(database.get_db)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("type") != "magic_link":
-            raise HTTPException(status_code=400, detail="Invalid token type")
-        email = payload.get("sub")
+        # Verify the Google JWT token
+        idinfo = id_token.verify_oauth2_token(
+            req.credential, google_requests.Request(), GOOGLE_CLIENT_ID
+        )
+        email = idinfo.get("email")
         if not email:
-            raise HTTPException(status_code=400, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=400, detail="Invalid or expired magic link")
+            raise HTTPException(status_code=400, detail="No email provided by Google")
+            
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
 
+    # Find or create user
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
         user = models.User(email=email)
@@ -92,8 +69,6 @@ def verify_magic_link(token: str, db: Session = Depends(database.get_db)):
         db.refresh(user)
 
         # Seed default TravelCards into Qdrant
-        import json
-        import uuid
         from app.db.qdrant_db import get_qdrant_client, get_embeddings, COLLECTION_NAME
         from qdrant_client.http.models import PointStruct
 
@@ -132,8 +107,6 @@ def verify_magic_link(token: str, db: Session = Depends(database.get_db)):
         data={"sub": str(user.id)}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    response = RedirectResponse(url=f"{frontend_url}/")
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -143,10 +116,11 @@ def verify_magic_link(token: str, db: Session = Depends(database.get_db)):
         secure=True,
         path="/"
     )
-    return response
+    return {"message": "Authenticated successfully"}
+
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie("access_token")
+    response.delete_cookie("access_token", path="/", samesite="none", secure=True)
     return {"message": "Logged out successfully"}
 
 @router.get("/me")
