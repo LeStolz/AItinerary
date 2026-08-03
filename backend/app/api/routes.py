@@ -116,7 +116,10 @@ async def get_checkpointer():
         if db_url.startswith("postgresql://"):
             db_url = db_url.replace("postgresql://", "postgres://", 1)
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-        async with AsyncPostgresSaver.from_conn_string(db_url) as memory:
+        from psycopg_pool import AsyncConnectionPool
+        
+        async with AsyncConnectionPool(db_url, kwargs={"prepare_threshold": None}) as pool:
+            memory = AsyncPostgresSaver(pool)
             await memory.setup()
             yield memory
     else:
