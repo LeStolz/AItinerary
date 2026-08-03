@@ -13,8 +13,6 @@ from google.auth.transport import requests as google_requests
 router = APIRouter()
 
 SECRET_KEY = os.getenv("DATABASE_SUPABASE_JWT_SECRET")
-if not SECRET_KEY:
-    raise ValueError("DATABASE_SUPABASE_JWT_SECRET is not set")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -56,8 +54,8 @@ def google_auth(req: GoogleAuthRequest, response: Response, db: Session = Depend
         email = idinfo.get("email")
         if not email:
             raise HTTPException(status_code=400, detail="No email provided by Google")
-            
-    except ValueError:
+
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid Google token")
 
     # Find or create user

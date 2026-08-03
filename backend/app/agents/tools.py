@@ -6,45 +6,55 @@ import json
 @tool
 def read_travel_board(query: str, config: RunnableConfig) -> str:
     """Search the user's travel board for relevant preferences, notes, and destinations using semantic search."""
-    user_id = config.get("configurable", {}).get("thread_id")
-    if not user_id:
-        return "Error: Could not determine user context."
-        
     try:
+        user_id = config.get("configurable", {}).get("thread_id")
+        print(f"============= READ_TRAVEL_BOARD TOOL CALLED =============", flush=True)
+        print(f"query: {query}", flush=True)
+        print(f"user_id extracted from config: {user_id} (type: {type(user_id)})", flush=True)
+        
+        if not user_id:
+            return "Error: Could not determine user context."
+
         from app.db.qdrant_db import get_qdrant_client, get_embeddings, COLLECTION_NAME
         from qdrant_client.http.models import Filter, FieldCondition, MatchValue
         import json
-        
+
         qdrant = get_qdrant_client()
         embeddings = get_embeddings()
-        
+
         vector = embeddings.embed_query(query)
-        
-        results = qdrant.search(
+
+        print("Searching Qdrant...", flush=True)
+        results = qdrant.query_points(
             collection_name=COLLECTION_NAME,
-            query_vector=vector,
+            query=vector,
             query_filter=Filter(
                 must=[FieldCondition(key="user_id", match=MatchValue(value=int(user_id)))]
             ),
             limit=5
-        )
+        ).points
+        print(f"Search returned {len(results)} results.", flush=True)
         
         if not results:
-            return "No relevant information found on the travel board for this query."
+            print("DEBUG_EMPTY: No vectors matched this user_id in Qdrant.", flush=True)
+            return "DEBUG_EMPTY: No vectors matched this user_id in Qdrant."
             
-        out = []
-        for res in results:
-            card = res.payload
+        formatted_results = []
+        for r in results:
+            title = r.payload.get("title", "Untitled")
+            content = r.payload.get("content", "")
             try:
-                data = json.loads(card["content"])
+                content_dict = json.loads(content)
+                content_text = content_dict.get("markdown", content)
             except:
-                data = {"markdown": card["content"]}
-            markdown = data.get("markdown", "") or data.get("note", "") or data.get("itinerary_markdown", "") or card["content"]
-            out.append(f"--- {card['type'].upper()}: {card['title']} ---\n{markdown}")
+                content_text = content
             
-        return "\n\n".join(out)
+            formatted_results.append(f"{title}\n{content_text}")
+            
+        return "\n\n---\n\n".join(formatted_results)
     except Exception as e:
-        return f"Error: {e}"
+        print(f"============= TOOL CRASHED: {e} =============", flush=True)
+        return f"DEBUG_ERROR: {e}"
 
 @tool
 async def geocode(location: str) -> str:
@@ -99,28 +109,28 @@ async def save_final_itinerary(trip_title: str, content: str, config: RunnableCo
     user_id = config.get("configurable", {}).get("thread_id")
     if not user_id:
         return "Error: Could not determine user context."
-        
+
     try:
         from app.db.qdrant_db import get_qdrant_client, get_embeddings, COLLECTION_NAME
         from qdrant_client.http.models import PointStruct
         import json
         import uuid
-        
+
         qdrant = get_qdrant_client()
         embeddings = get_embeddings()
-        
+
         card_id = uuid.uuid4().hex
-        
+
         payload = {
             "user_id": int(user_id),
             "type": "itinerary",
             "title": f"Itinerary: {trip_title}",
             "content": json.dumps({"markdown": content})
         }
-        
+
         text_to_embed = f"{payload['title']}\n{payload['content']}"
         vector = embeddings.embed_query(text_to_embed)
-        
+
         qdrant.upsert(
             collection_name=COLLECTION_NAME,
             points=[PointStruct(id=card_id, vector=vector, payload=payload)]

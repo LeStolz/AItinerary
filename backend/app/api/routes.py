@@ -110,14 +110,14 @@ async def get_checkpointer():
     if db_url:
         db_url = db_url.replace("?pgbouncer=true", "")
         db_url = db_url.replace("&pgbouncer=true", "")
-        
+
     if db_url and db_url.startswith("postgres"):
         # Fix for sqlalchemy postgresql:// vs psycopg postgres://
         if db_url.startswith("postgresql://"):
             db_url = db_url.replace("postgresql://", "postgres://", 1)
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
         from psycopg_pool import AsyncConnectionPool
-        
+
         async with AsyncConnectionPool(db_url, kwargs={"prepare_threshold": None}) as pool:
             memory = AsyncPostgresSaver(pool)
             await memory.setup()
@@ -215,7 +215,7 @@ async def chat_endpoint(request: Request, user: models.User = Depends(get_curren
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                     yield json.dumps({
                         "sender": "System",
-                        "content": "[!] You have hit the Google API Rate Limit (Your key is currently limited to 5 Requests Per Minute). Please wait a minute or upgrade your Google Cloud tier to use multi-agent workflows."
+                        "content": "[!] You have hit the Google API Rate Limit (Your key is currently limited to 15 Requests Per Minute). Please wait a minute or upgrade your Google Cloud tier to use multi-agent workflows."
                     })
                     break
                 else:
@@ -230,3 +230,14 @@ async def chat_endpoint(request: Request, user: models.User = Depends(get_curren
             yield {"data": chunk}
 
     return EventSourceResponse(sse_generator())
+
+@router.get("/test-tool")
+def test_tool_endpoint(user_id: str = "2"):
+    from app.agents.tools import read_travel_board
+    from langchain_core.runnables import RunnableConfig
+    try:
+        cfg = RunnableConfig(configurable={"thread_id": user_id})
+        res = read_travel_board.invoke({"query": "Plan my dream trip"}, config=cfg)
+        return {"result": res}
+    except Exception as e:
+        return {"error": str(e)}

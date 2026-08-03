@@ -3,6 +3,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel, Field
 from typing import Literal
+from langchain_core.runnables import RunnableConfig
 
 from app.agents.state import AgentState
 from app.agents.tools import scrapbook_tools, logistics_tools, booking_tools
@@ -12,8 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", temperature=0, max_retries=3)
+llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", max_retries=3)
 
 class Router(BaseModel):
     next: Literal["Scrapbook Agent", "Logistics Agent", "Booking Agent", "FINISH"]
@@ -26,9 +26,11 @@ Your team:
 - Booking Agent: Validates live feasibility and costs, fetching real prices for accommodations and finalizing itineraries.
 
 Analyze the conversation history.
-1. Determine if an expert is needed to fulfill the request. If so, route to them and leave the response field completely EMPTY. Do NOT provide transition messages. Let the experts do the talking.
-2. NEVER route to the same expert twice in a row. If an expert just responded, you MUST move on to another expert in the workflow (e.g. Scrapbook -> Logistics -> Booking), or FINISH if the user's request is fully answered.
-3. If the request is fully answered, or if it's a casual greeting, route to FINISH. Provide a natural, friendly response.
+1. Determine if an expert is needed. If the user asks to plan a trip, or check their scrapbook, you MUST ALWAYS route to the Scrapbook Agent FIRST to retrieve their profile and destinations, UNLESS the Scrapbook Agent just responded in the previous turn.
+2. If you route to an expert, leave the response field completely EMPTY. Let the experts do the talking.
+3. CRITICAL RULE: NEVER route to the same expert twice in a row! Look at the sender of the very last message. If the last message was from 'Scrapbook Agent', you CANNOT route to 'Scrapbook Agent' again! You must route to FINISH or Logistics Agent.
+4. IMPORTANT ROUTING RULE: If the user ONLY asked to look up information (e.g., "what is my dream trip?", "what are my preferences?"), and the Scrapbook Agent just answered, you MUST route to FINISH. Do NOT route to the Logistics Agent unless the user EXPLICITLY asked you to build an itinerary or plan the trip!
+5. If the user's request is fully answered, route to FINISH and provide a friendly summary.
 """
 
 async def supervisor_node(state: AgentState):
@@ -36,6 +38,16 @@ async def supervisor_node(state: AgentState):
 
     router_llm = llm.with_structured_output(Router)
     result = await router_llm.ainvoke(messages)
+
+    # Python-level loop prevention fallback
+    if len(state["messages"]) > 0:
+        last_msg = state["messages"][-1]
+        last_sender = getattr(last_msg, "name", None)
+        if last_sender == result.next and result.next != "FINISH":
+            print(f"[Orchestrator] Caught loop! Forcing FINISH instead of {result.next}", flush=True)
+            result.next = "FINISH"
+            if not result.response:
+                result.response = "I have retrieved the latest information. Let me know if you want to proceed!"
 
     out_messages = []
     if result.response:
@@ -50,10 +62,10 @@ def make_worker_node(tools, system_prompt):
     # create_react_agent returns a compiled graph
     agent = create_react_agent(llm, tools=tools, prompt=system_prompt)
 
-    async def worker_node(state: AgentState):
+    async def worker_node(state: AgentState, config: RunnableConfig):
         name = system_prompt.split(".")[0]
         print(f"\n[{name}] Starting task...", flush=True)
-        result = await agent.ainvoke({"messages": state["messages"]})
+        result = await agent.ainvoke({"messages": state["messages"]}, config=config)
         last_message = result["messages"][-1]
         print(f"[{name}] Finished task.", flush=True)
         return {"messages": [HumanMessage(content=last_message.content, name=name)]}
