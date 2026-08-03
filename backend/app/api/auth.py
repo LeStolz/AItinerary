@@ -139,7 +139,8 @@ def verify_magic_link(token: str, db: Session = Depends(database.get_db)):
         value=access_token,
         httponly=True,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
+        samesite="none",
+        secure=True,
         path="/"
     )
     return response
