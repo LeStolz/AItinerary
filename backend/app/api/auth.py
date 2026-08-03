@@ -8,7 +8,7 @@ from app.db import models, database
 router = APIRouter()
 import os
 
-SECRET_KEY = os.getenv("JWT_SECRET")
+SECRET_KEY = os.getenv("DATABASE_SUPABASE_JWT_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
@@ -51,14 +51,14 @@ class MagicLinkRequest(BaseModel):
     email: str
 
 @router.post("/send-magic-link")
-def send_magic_link(req: MagicLinkRequest):
+def send_magic_link(req: MagicLinkRequest, request: Request):
     expires_delta = timedelta(minutes=15)
     to_encode = {"sub": req.email, "type": "magic_link"}
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
     magic_token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-    verify_url = f"http://localhost:8000/api/auth/verify?token={magic_token}"
+    verify_url = f"{request.base_url.replace(path='')}/api/auth/verify?token={magic_token}"
 
     try:
         resend.Emails.send({
@@ -132,7 +132,8 @@ def verify_magic_link(token: str, db: Session = Depends(database.get_db)):
         data={"sub": str(user.id)}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
-    response = RedirectResponse(url="http://localhost:5173/")
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    response = RedirectResponse(url=f"{frontend_url}/")
     response.set_cookie(
         key="access_token",
         value=access_token,

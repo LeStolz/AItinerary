@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aitinerary.db")
+DATABASE_URL = os.getenv("DATABASE_POSTGRES_PRISMA_URL") or "sqlite:///./aitinerary.db"
 
 # If it's Postgres, we shouldn't use check_same_thread
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}

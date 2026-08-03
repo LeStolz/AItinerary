@@ -18,29 +18,29 @@ models.Base.metadata.create_all(bind=database.engine)
 def create_card(card: schemas.TravelCardCreate, db: Session = Depends(database.get_db), user: models.User = Depends(get_current_user)):
     qdrant = get_qdrant_client()
     embeddings = get_embeddings()
-    
+
     card_id = uuid.uuid4().hex
     text_to_embed = f"{card.title}\n{card.content}"
     vector = embeddings.embed_query(text_to_embed)
-    
+
     payload = {
         "user_id": user.id,
         "type": card.type,
         "title": card.title,
         "content": card.content
     }
-    
+
     qdrant.upsert(
         collection_name=COLLECTION_NAME,
         points=[PointStruct(id=card_id, vector=vector, payload=payload)]
     )
-    
+
     return {"id": card_id, **payload}
 
 @router.get("/cards", response_model=List[schemas.TravelCardOut])
 def read_cards(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), user: models.User = Depends(get_current_user)):
     qdrant = get_qdrant_client()
-    
+
     results = qdrant.scroll(
         collection_name=COLLECTION_NAME,
         scroll_filter=Filter(
@@ -49,7 +49,7 @@ def read_cards(skip: int = 0, limit: int = 100, db: Session = Depends(database.g
         limit=limit,
         offset=skip
     )[0]
-    
+
     out = []
     for p in results:
         out.append({"id": p.id, **p.payload})
@@ -58,11 +58,11 @@ def read_cards(skip: int = 0, limit: int = 100, db: Session = Depends(database.g
 @router.delete("/cards/{card_id}")
 def delete_card(card_id: str, db: Session = Depends(database.get_db), user: models.User = Depends(get_current_user)):
     qdrant = get_qdrant_client()
-    
+
     points = qdrant.retrieve(collection_name=COLLECTION_NAME, ids=[card_id])
     if not points or points[0].payload.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Card not found")
-        
+
     qdrant.delete(collection_name=COLLECTION_NAME, points_selector=[card_id])
     return {"ok": True}
 
@@ -70,26 +70,26 @@ def delete_card(card_id: str, db: Session = Depends(database.get_db), user: mode
 def update_card(card_id: str, card: schemas.TravelCardCreate, db: Session = Depends(database.get_db), user: models.User = Depends(get_current_user)):
     qdrant = get_qdrant_client()
     embeddings = get_embeddings()
-    
+
     points = qdrant.retrieve(collection_name=COLLECTION_NAME, ids=[card_id])
     if not points or points[0].payload.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Card not found")
-        
+
     text_to_embed = f"{card.title}\n{card.content}"
     vector = embeddings.embed_query(text_to_embed)
-    
+
     payload = {
         "user_id": user.id,
         "type": card.type,
         "title": card.title,
         "content": card.content
     }
-    
+
     qdrant.upsert(
         collection_name=COLLECTION_NAME,
         points=[PointStruct(id=card_id, vector=vector, payload=payload)]
     )
-    
+
     return {"id": card_id, **payload}
 
 from fastapi import Request
@@ -106,7 +106,7 @@ import os
 
 @asynccontextmanager
 async def get_checkpointer():
-    db_url = os.getenv("DATABASE_URL")
+    db_url = os.getenv("DATABASE_POSTGRES_PRISMA_URL") or "sqlite:///./aitinerary.db"
     if db_url and db_url.startswith("postgres"):
         # Fix for sqlalchemy postgresql:// vs psycopg postgres://
         if db_url.startswith("postgresql://"):
@@ -125,24 +125,24 @@ workflow = build_graph()
 async def get_chat_history(user: models.User = Depends(get_current_user)):
     config = {"configurable": {"thread_id": str(user.id)}}
     messages = []
-    
+
     async with get_checkpointer() as memory:
         graph = workflow.compile(checkpointer=memory)
         state = await graph.aget_state(config)
-        
+
         if state and hasattr(state, "values") and "messages" in state.values:
             for msg in state.values["messages"]:
                 # The UI only expects the original User message and the final node outputs (which are HumanMessages with names)
                 if isinstance(msg, HumanMessage):
                     sender = getattr(msg, "name", None)
-                    
+
                     raw_content = msg.content
                     if isinstance(raw_content, list):
                         text_parts = [p.get("text", "") if isinstance(p, dict) else str(p) for p in raw_content]
                         content_str = "".join(text_parts)
                     else:
                         content_str = str(raw_content)
-                    
+
                     if not sender:
                         messages.append({
                             "sender": "User",
@@ -155,7 +155,7 @@ async def get_chat_history(user: models.User = Depends(get_current_user)):
                             "content": content_str,
                             "type": "agent"
                         })
-                
+
     return messages
 
 @router.post("/chat")
@@ -163,12 +163,12 @@ async def chat_endpoint(request: Request, user: models.User = Depends(get_curren
     data = await request.json()
     message = data.get("message")
     config = {"configurable": {"thread_id": str(user.id)}}
-    
+
     initial_state = {
         "messages": [HumanMessage(content=message)],
         "next": ""
     }
-    
+
     async def event_generator() -> AsyncGenerator[str, None]:
         input_state = initial_state
         while True:
@@ -189,14 +189,14 @@ async def chat_endpoint(request: Request, user: models.User = Depends(get_curren
                                 name = getattr(msg, "name", node_name)
                                 if not name:
                                     name = node_name
-                                    
+
                                 raw_content = msg.content
                                 if isinstance(raw_content, list):
                                     text_parts = [p.get("text", "") if isinstance(p, dict) else str(p) for p in raw_content]
                                     content_str = "".join(text_parts)
                                 else:
                                     content_str = str(raw_content)
-                                
+
                                 yield json.dumps({
                                     "sender": name,
                                     "content": content_str
@@ -224,4 +224,3 @@ async def chat_endpoint(request: Request, user: models.User = Depends(get_curren
             yield {"data": chunk}
 
     return EventSourceResponse(sse_generator())
-
