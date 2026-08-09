@@ -1,3 +1,6 @@
+[Demo Link](https://aitinerary-frontend.vercel.app/)
+*Note: As the demo uses free APIs, it loads slowly and the agents can sometimes respond poorly.*
+
 ## Multi-Agent System Design
 An intelligent travel planner, tuned from **Google Gemini 3.5 Flash LLM Engine** using **prompt engineering**, that crafts tailored, real-time trip itineraries by combining personal user preferences, curated travel knowledge and desires, and live external services.
 
